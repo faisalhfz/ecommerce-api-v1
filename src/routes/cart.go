@@ -10,4 +10,6 @@ func CartRoutes(g *echo.Group, cartHandler *handler.CartHandler) {
 	g.GET("/cart", cartHandler.GetCartHandler)
 	g.POST("/cart", cartHandler.PostCartHandler)
 	g.DELETE("/cart", cartHandler.DeleteCartHandler)
+	// g.PUT("/cart/order/:id", cartHandler.PutCartOrderHandler)
+	g.DELETE("/cart/order/:id", cartHandler.DeleteCartOrderByIdHandler)
 }

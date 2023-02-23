@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"ecommerce-api/src/entity"
 	"ecommerce-api/src/entity/request"
 	"ecommerce-api/src/entity/response"
 	"ecommerce-api/src/repository"
@@ -10,32 +9,32 @@ import (
 )
 
 type ICartUsecase interface {
-	CreateCart(cartRequest request.CreateCartRequest) (response.CartIDResponse, error)
+	CreateCart(cartRequest request.CreateCartRequest) error
 	GetCart() (response.GetCartResponse, error)
-	// AddProductToCart(productId int) error
 	CheckoutCart() (response.GetCartResponse, error)
 	GetCompletedCarts() ([]response.GetCartResponse, error)
 	ClearCart() error
-	// RemoveProductFromCart(productId int) error
-	// IsProductInCart(productId int, cart *entity.Cart) bool
+	// UpdateOrderInCart(orderId int, newOrder request.CreateOrderRequest) error
+	RemoveOrderFromCart(orderId int) error
 }
 
 type CartUsecase struct {
 	cRepository repository.ICartRepository
+	oRepository repository.IOrderRepository
 	pRepository repository.IProductRepository
 }
 
-func NewCartUsecase(cRepository repository.ICartRepository, pRepository repository.IProductRepository) *CartUsecase {
-	return &CartUsecase{cRepository: cRepository, pRepository: pRepository}
+func NewCartUsecase(cRepository repository.ICartRepository, oRepository repository.IOrderRepository, pRepository repository.IProductRepository) *CartUsecase {
+	return &CartUsecase{cRepository, oRepository, pRepository}
 }
 
-func (cUsecase CartUsecase) CreateCart() (response.CartIDResponse, error) {
-	cart := request.CreateCartRequest{ProductsList: []entity.ProductEntry{}, TotalPrice: 0, IsCheckout: false}
-	id, err := cUsecase.cRepository.CreateCart(cart)
+func (cUsecase CartUsecase) CreateCart() error {
+	cart := request.CreateCartRequest{TotalPrice: 0, IsCheckout: false}
+	_, err := cUsecase.cRepository.CreateCart(cart)
 	if err != nil {
-		return response.CartIDResponse{}, err
+		return err
 	}
-	return response.CartIDResponse{CartID: id}, nil
+	return nil
 }
 
 func (cUsecase CartUsecase) GetCart() (response.GetCartResponse, error) {
@@ -43,30 +42,19 @@ func (cUsecase CartUsecase) GetCart() (response.GetCartResponse, error) {
 	if err != nil {
 		return response.GetCartResponse{}, err
 	}
-	productsListResponse := []response.GetProductEntryResponse{}
-	for _, productEntry := range cart.ProductsList {
-		product, _ := cUsecase.pRepository.GetProduct(productEntry.ProductID)
+
+	ordersListResponse := []*response.GetOrderResponse{}
+	for _, order := range cart.OrdersList {
+		product, _ := cUsecase.pRepository.GetProduct(order.ProductID)
 		productResponse := response.GetProductResponse{}
 		copier.Copy(&productResponse, &product)
-		productEntryResponse := response.GetProductEntryResponse{Product: productResponse, Quantity: productEntry.Quantity}
-		productsListResponse = append(productsListResponse, productEntryResponse)
+		orderResponse := response.GetOrderResponse{ID: order.ID, Product: &productResponse, Quantity: order.Quantity}
+		ordersListResponse = append(ordersListResponse, &orderResponse)
 	}
+	cartResponse := response.GetCartResponse{ID: cart.ID, OrdersList: ordersListResponse, TotalPrice: cart.TotalPrice}
 
-	cartResponse := response.GetCartResponse{ID: cart.ID, ProductsList: productsListResponse, TotalPrice: cart.TotalPrice}
 	return cartResponse, nil
 }
-
-// func (cUsecase CartUsecase) AddProductToCart(productId int, quantity int) (response.CartIDResponse, error) {
-// 	product, _ := cUsecase.pRepository.GetProduct(productId)
-
-// 	var newProduct entity.Product
-// 	copier.Copy(&newProduct, &product)
-// 	cartId, err := cUsecase.cRepository.AddProduct(newProduct, quantity)
-// 	if err != nil {
-// 		return response.CartIDResponse{}, err
-// 	}
-// 	return response.CartIDResponse{CartID: cartId}, nil
-// }
 
 func (cUsecase CartUsecase) CheckoutCart() (response.GetCartResponse, error) {
 	cart, err := cUsecase.cRepository.CheckoutCart()
@@ -74,16 +62,16 @@ func (cUsecase CartUsecase) CheckoutCart() (response.GetCartResponse, error) {
 		return response.GetCartResponse{}, err
 	}
 
-	productsListResponse := []response.GetProductEntryResponse{}
-	for _, productEntry := range cart.ProductsList {
-		product, _ := cUsecase.pRepository.GetProduct(productEntry.ProductID)
+	ordersListResponse := []*response.GetOrderResponse{}
+	for _, order := range cart.OrdersList {
+		product, _ := cUsecase.pRepository.GetProduct(order.ProductID)
 		productResponse := response.GetProductResponse{}
 		copier.Copy(&productResponse, &product)
-		productEntryResponse := response.GetProductEntryResponse{Product: productResponse, Quantity: productEntry.Quantity}
-		productsListResponse = append(productsListResponse, productEntryResponse)
+		orderResponse := response.GetOrderResponse{ID: order.ID, Product: &productResponse, Quantity: order.Quantity}
+		ordersListResponse = append(ordersListResponse, &orderResponse)
 	}
+	cartResponse := response.GetCartResponse{ID: cart.ID, OrdersList: ordersListResponse, TotalPrice: cart.TotalPrice}
 
-	cartResponse := response.GetCartResponse{ID: cart.ID, ProductsList: productsListResponse, TotalPrice: cart.TotalPrice}
 	return cartResponse, nil
 }
 
@@ -105,36 +93,34 @@ func (cUsecase CartUsecase) GetCompletedCarts() ([]response.GetCartResponse, err
 	}
 
 	cartsResponse := []response.GetCartResponse{}
-	for _, cart := range carts {
 
-		productsListResponse := []response.GetProductEntryResponse{}
-		for _, productEntry := range cart.ProductsList {
-			product, _ := cUsecase.pRepository.GetProduct(productEntry.ProductID)
+	for _, cart := range carts {
+		ordersListResponse := []*response.GetOrderResponse{}
+
+		for _, order := range cart.OrdersList {
+			product, _ := cUsecase.pRepository.GetProduct(order.ProductID)
 			productResponse := response.GetProductResponse{}
 			copier.Copy(&productResponse, &product)
-			productEntryResponse := response.GetProductEntryResponse{Product: productResponse, Quantity: productEntry.Quantity}
-			productsListResponse = append(productsListResponse, productEntryResponse)
+			orderResponse := response.GetOrderResponse{ID: order.ID, Product: &productResponse, Quantity: order.Quantity}
+			ordersListResponse = append(ordersListResponse, &orderResponse)
 		}
+		cartResponse := response.GetCartResponse{ID: cart.ID, OrdersList: ordersListResponse, TotalPrice: cart.TotalPrice}
 
-		cartResponse := response.GetCartResponse{ID: cart.ID, ProductsList: productsListResponse, TotalPrice: cart.TotalPrice}
 		cartsResponse = append(cartsResponse, cartResponse)
 	}
 	return cartsResponse, nil
 }
 
-// func (cUsecase CartUsecase) RemoveProductFromCart(productId int) error {
-// 	if err := cUsecase.cRepository.RemoveProduct(productId); err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
-
-// func (cUsecase CartUsecase) IsProductInCart(productId int, cart *entity.Cart) bool {
-// 	productList := cart.Products
-// 	for _, product := range productList {
-// 		if product.ID == productId {
-// 			return true
-// 		}
-// 	}
-// 	return false
-// }
+func (cUsecase CartUsecase) RemoveOrderFromCart(orderId int) error {
+	order, err := cUsecase.oRepository.GetOrder(orderId)
+	if err != nil {
+		return err
+	}
+	if err := cUsecase.cRepository.RemoveOrder(order); err != nil {
+		return err
+	}
+	if err := cUsecase.oRepository.DeleteOrder(order); err != nil {
+		return err
+	}
+	return nil
+}

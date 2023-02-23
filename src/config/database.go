@@ -26,5 +26,5 @@ func Database() {
 func AutoMigrate() {
 	DB.AutoMigrate(&entity.Product{})
 	DB.AutoMigrate(&entity.Cart{})
-	DB.AutoMigrate(&entity.ProductEntry{})
+	DB.AutoMigrate(&entity.Order{})
 }

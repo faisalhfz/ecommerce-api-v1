@@ -19,13 +19,15 @@ func main() {
 	config.AutoMigrate()
 
 	productRepository := repository.NewProductRepository(config.DB)
+	orderRepository := repository.NewOrderRepository(config.DB)
 	cartRepository := repository.NewCartRepository(config.DB)
 
-	productUsecase := usecase.NewProductUsecase(productRepository, cartRepository)
-	cartUsecase := usecase.NewCartUsecase(cartRepository, productRepository)
+	productUsecase := usecase.NewProductUsecase(productRepository, orderRepository, cartRepository)
+	orderUsecase := usecase.NewOrderUsecase(orderRepository, cartRepository)
+	cartUsecase := usecase.NewCartUsecase(cartRepository, orderRepository, productRepository)
 
 	productHandler := handler.NewProductHandler(productUsecase, cartUsecase)
-	cartHandler := handler.NewCartHandler(cartUsecase)
+	cartHandler := handler.NewCartHandler(cartUsecase, orderUsecase)
 	transactionHandler := handler.NewTransactionHandler(cartUsecase)
 
 	e := echo.New()

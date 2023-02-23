@@ -16,15 +16,17 @@ type IProductUsecase interface {
 	EditProductById(id int, productRequest request.CreateProductRequest) error
 	DeleteProductById(id int) error
 	AddProductToCart(productId int, quantity int) (response.CartIDResponse, error)
+	IsProductInCart(productId int) bool
 }
 
 type ProductUsecase struct {
 	pRepository repository.IProductRepository
+	oRepository repository.IOrderRepository
 	cRepository repository.ICartRepository
 }
 
-func NewProductUsecase(pRepository repository.IProductRepository, cRepository repository.ICartRepository) *ProductUsecase {
-	return &ProductUsecase{pRepository, cRepository}
+func NewProductUsecase(pRepository repository.IProductRepository, oRepository repository.IOrderRepository, cRepository repository.ICartRepository) *ProductUsecase {
+	return &ProductUsecase{pRepository, oRepository, cRepository}
 }
 
 func (pUsecase ProductUsecase) CreateProduct(productRequest request.CreateProductRequest) (response.ProductIDResponse, error) {
@@ -72,18 +74,29 @@ func (pUsecase ProductUsecase) DeleteProductById(id int) error {
 	return nil
 }
 
-func (pUsecase ProductUsecase) AddProductToCart(productId int, quantity int) (response.CartIDResponse, error) {
+func (pUsecase ProductUsecase) AddProductToCart(productId int, quantity int) (response.NewOrderResponse, error) {
 	product, _ := pUsecase.pRepository.GetProduct(productId)
 
-	productEntryRequest := request.CreateProductEntryRequest{Product: *product, Quantity: quantity}
-	productEntry, err := pUsecase.pRepository.CreateProductEntry(productEntryRequest)
+	orderRequest := request.CreateOrderRequest{Product: product, Quantity: quantity}
+	orderId, err := pUsecase.oRepository.CreateOrder(orderRequest)
 	if err != nil {
-		return response.CartIDResponse{}, err
+		return response.NewOrderResponse{}, err
 	}
 
-	cartId, err := pUsecase.cRepository.AddProduct(productEntry)
+	order, err := pUsecase.oRepository.GetOrder(orderId)
+	cartId, err := pUsecase.cRepository.AddOrder(order)
 	if err != nil {
-		return response.CartIDResponse{}, err
+		return response.NewOrderResponse{}, err
 	}
-	return response.CartIDResponse{CartID: cartId}, nil
+	return response.NewOrderResponse{CartID: cartId, OrderID: orderId}, nil
+}
+
+func (pUsecase ProductUsecase) IsProductInCart(productId int) bool {
+	cart, _ := pUsecase.cRepository.GetCart()
+	for _, order := range cart.OrdersList {
+		if order.Product.ID == productId {
+			return true
+		}
+	}
+	return false
 }

@@ -214,7 +214,7 @@ func (pHandler ProductHandler) PostProductToCartByIdHandler(ctx echo.Context) er
 	if err != nil {
 		return ctx.JSON(http.StatusBadRequest, response.BaseResponse{
 			Code:    http.StatusBadRequest,
-			Message: "Invalid product id",
+			Message: "Invalid id",
 			Data:    nil,
 		})
 	}
@@ -233,8 +233,7 @@ func (pHandler ProductHandler) PostProductToCartByIdHandler(ctx echo.Context) er
 
 	_, err = pHandler.cUsecase.GetCart()
 	if err != nil {
-		_, err := pHandler.cUsecase.CreateCart()
-		if err != nil {
+		if err := pHandler.cUsecase.CreateCart(); err != nil {
 			return ctx.JSON(http.StatusBadRequest, response.BaseResponse{
 				Code:    http.StatusBadRequest,
 				Message: "Failed to create cart",
@@ -242,18 +241,27 @@ func (pHandler ProductHandler) PostProductToCartByIdHandler(ctx echo.Context) er
 			})
 		}
 	}
-	cartId, err := pHandler.pUsecase.AddProductToCart(id, quantity)
+
+	if pHandler.pUsecase.IsProductInCart(id) == true {
+		return ctx.JSON(http.StatusBadRequest, response.BaseResponse{
+			Code:    http.StatusBadRequest,
+			Message: "Product already in cart",
+			Data:    nil,
+		})
+	}
+
+	newOrder, err := pHandler.pUsecase.AddProductToCart(id, quantity)
 	if err != nil {
 		return ctx.JSON(http.StatusBadRequest, response.BaseResponse{
 			Code:    http.StatusBadRequest,
-			Message: "Failed to add product to cart",
+			Message: "Failed to put order to cart",
 			Data:    nil,
 		})
 	}
 	return ctx.JSON(http.StatusOK, response.BaseResponse{
 		Code:    http.StatusOK,
-		Message: "Successfully added product to cart",
-		Data:    cartId,
+		Message: "Successfully put order to cart",
+		Data:    newOrder,
 	})
 }
 

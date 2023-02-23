@@ -4,16 +4,18 @@ import (
 	"ecommerce-api/src/entity/response"
 	"ecommerce-api/src/usecase"
 	"net/http"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 )
 
 type CartHandler struct {
 	cUsecase *usecase.CartUsecase
+	oUsecase *usecase.OrderUsecase
 }
 
-func NewCartHandler(cUsecase *usecase.CartUsecase) *CartHandler {
-	return &CartHandler{cUsecase: cUsecase}
+func NewCartHandler(cUsecase *usecase.CartUsecase, oUsecase *usecase.OrderUsecase) *CartHandler {
+	return &CartHandler{cUsecase, oUsecase}
 }
 
 func (cHandler CartHandler) GetCartHandler(ctx echo.Context) error {
@@ -88,40 +90,40 @@ func (cHandler CartHandler) DeleteCartHandler(ctx echo.Context) error {
 	})
 }
 
-// func (cHandler CartHandler) DeleteProductFromCartHandler(ctx echo.Context) error {
-// 	id, err := strconv.Atoi(ctx.Param("id"))
-// 	if err != nil {
-// 		return ctx.JSON(http.StatusBadRequest, response.BaseResponse{
-// 			Code:    http.StatusBadRequest,
-// 			Message: "Invalid product id",
-// 			Data:    nil,
-// 		})
-// 	}
-// 	cart, err := cHandler.cUsecase.GetCart()
-// 	if err != nil {
-// 		return ctx.JSON(http.StatusNotFound, response.BaseResponse{
-// 			Code:    http.StatusNotFound,
-// 			Message: "No carts found",
-// 			Data:    nil,
-// 		})
-// 	}
-// 	if cHandler.cUsecase.IsProductInCart(id, cart) == false {
-// 		return ctx.JSON(http.StatusNotFound, response.BaseResponse{
-// 			Code:    http.StatusNotFound,
-// 			Message: "Product not found in cart",
-// 			Data:    nil,
-// 		})
-// 	}
-// 	if err := cHandler.cUsecase.RemoveProductFromCart(id); err != nil {
-// 		return ctx.JSON(http.StatusBadRequest, response.BaseResponse{
-// 			Code:    http.StatusBadRequest,
-// 			Message: "Failed to remove product from cart",
-// 			Data:    nil,
-// 		})
-// 	}
-// 	return ctx.JSON(http.StatusOK, response.BaseResponse{
-// 		Code:    http.StatusOK,
-// 		Message: "Successfully removed product from cart",
-// 		Data:    nil,
-// 	})
-// }
+func (cHandler CartHandler) DeleteCartOrderByIdHandler(ctx echo.Context) error {
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, response.BaseResponse{
+			Code:    http.StatusBadRequest,
+			Message: "Invalid id",
+			Data:    nil,
+		})
+	}
+	_, err = cHandler.cUsecase.GetCart()
+	if err != nil {
+		return ctx.JSON(http.StatusNotFound, response.BaseResponse{
+			Code:    http.StatusNotFound,
+			Message: "No carts found",
+			Data:    nil,
+		})
+	}
+	if cHandler.oUsecase.IsOrderInCart(id) == false {
+		return ctx.JSON(http.StatusNotFound, response.BaseResponse{
+			Code:    http.StatusNotFound,
+			Message: "Order not found in cart",
+			Data:    nil,
+		})
+	}
+	if err := cHandler.cUsecase.RemoveOrderFromCart(id); err != nil {
+		return ctx.JSON(http.StatusBadRequest, response.BaseResponse{
+			Code:    http.StatusBadRequest,
+			Message: "Failed to remove order from cart",
+			Data:    nil,
+		})
+	}
+	return ctx.JSON(http.StatusOK, response.BaseResponse{
+		Code:    http.StatusOK,
+		Message: "Successfully removed order from cart",
+		Data:    nil,
+	})
+}

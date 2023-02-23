@@ -8,10 +8,3 @@ type Product struct {
 	Category    string `json:"category"`
 	Description string `json:"description"`
 }
-
-type ProductEntry struct {
-	ID        int     `json:"id"`
-	ProductID int     `json:"product_id"`
-	Product   Product `json:"product" gorm:"foreignKey:ProductID"`
-	Quantity  int     `json:"quantity"`
-}

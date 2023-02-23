@@ -11,14 +11,11 @@ import (
 type ICartRepository interface {
 	CreateCart(cartRequest request.CreateCartRequest) (int, error)
 	GetCart() (*entity.Cart, error)
-	AddProduct(productEntry entity.ProductEntry) (int, error)
 	CheckoutCart() (*entity.Cart, error)
 	GetCompletedCarts() ([]entity.Cart, error)
 	DeleteCart(cart *entity.Cart) error
-	// IsProductExist(productId int) (bool, error)
-
-	// RemoveProduct(productId int) error
-	// GetProductsList() ([]entity.ProductEntry, error)
+	AddOrder(order *entity.Order) (int, error)
+	RemoveOrder(order *entity.Order) error
 }
 
 type CartRepository struct {
@@ -35,29 +32,16 @@ func (cRepository CartRepository) CreateCart(cartRequest request.CreateCartReque
 	if err := cRepository.db.Debug().Create(&cart).Error; err != nil {
 		return 0, err
 	}
-	cRepository.db.Model(&cart).Association("ProductsList").Append(&cart.ProductsList)
+	cRepository.db.Model(&cart).Association("OrdersList").Append(&cart.OrdersList)
 	return cart.ID, nil
 }
 
 func (cRepository CartRepository) GetCart() (*entity.Cart, error) {
 	var cart *entity.Cart
-	if err := cRepository.db.Preload("ProductsList").Where("is_checkout = ?", false).First(&cart).Error; err != nil {
+	if err := cRepository.db.Preload("OrdersList").Where("is_checkout = ?", false).First(&cart).Error; err != nil {
 		return nil, err
 	}
 	return cart, nil
-}
-
-func (cRepository CartRepository) AddProduct(productEntry entity.ProductEntry) (int, error) {
-	cart, _ := cRepository.GetCart()
-
-	cart.ProductsList = append(cart.ProductsList, productEntry)
-	cart.TotalPrice += productEntry.Product.Price * productEntry.Quantity
-
-	cRepository.db.Model(&cart).Association("ProductsList").Replace(&cart.ProductsList)
-	if err := cRepository.db.Session(&gorm.Session{FullSaveAssociations: true}).Updates(&cart).Error; err != nil {
-		return 0, err
-	}
-	return cart.ID, nil
 }
 
 func (cRepository CartRepository) CheckoutCart() (*entity.Cart, error) {
@@ -65,7 +49,7 @@ func (cRepository CartRepository) CheckoutCart() (*entity.Cart, error) {
 	if err != nil {
 		return nil, err
 	}
-	cRepository.db.Preload("ProductsList").First(&cart)
+	cRepository.db.Preload("OrdersList").First(&cart)
 	cart.IsCheckout = true
 	if err := cRepository.db.Session(&gorm.Session{FullSaveAssociations: true}).Updates(&cart).Error; err != nil {
 		return nil, err
@@ -75,69 +59,55 @@ func (cRepository CartRepository) CheckoutCart() (*entity.Cart, error) {
 
 func (cRepository CartRepository) GetCompletedCarts() ([]entity.Cart, error) {
 	var carts []entity.Cart
-	if err := cRepository.db.Preload("ProductsList").Where("is_checkout = ?", true).Find(&carts).Error; err != nil {
+	if err := cRepository.db.Preload("OrdersList").Where("is_checkout = ?", true).Find(&carts).Error; err != nil {
 		return nil, err
 	}
 	return carts, nil
 }
 
 func (cRepository CartRepository) DeleteCart(cart *entity.Cart) error {
-	var products []entity.Product
-	cRepository.db.Model(entity.Product{}).Find(&products)
-	cRepository.db.Model(&cart).Association("Languages").Delete(products)
+	cRepository.db.Model(&cart).Association("OrdersList").Delete(&cart.OrdersList)
 	if err := cRepository.db.Debug().Delete(&cart).Error; err != nil {
 		return err
 	}
 	return nil
 }
 
-// func (cRepository CartRepository) IsProductExist(productId int) (bool, error) {
-// 	cart, err := cRepository.GetCart()
-// 	if err != nil {
-// 		return false, err
-// 	}
+func (cRepository CartRepository) AddOrder(order *entity.Order) (int, error) {
+	cart, _ := cRepository.GetCart()
 
-// 	productList := []entity.CartProducts{}
+	cart.OrdersList = append(cart.OrdersList, *order)
+	cart.TotalPrice += order.Product.Price * order.Quantity
 
-// 	if err := cRepository.db.Where("cart_id = ?", cart.ID).Find(&productList).Error; err != nil {
-// 		return false, err
-// 	}
+	cRepository.db.Model(&cart).Association("OrdersList").Replace(&cart.OrdersList)
+	if err := cRepository.db.Session(&gorm.Session{FullSaveAssociations: true}).Updates(&cart).Error; err != nil {
+		return 0, err
+	}
+	return cart.ID, nil
+}
 
-// 	for _, entry := range productList {
-// 		if entry.ProductID == productId {
-// 			return true, nil
-// 		}
-// 	}
-// 	return false, nil
-// }
+func (cRepository CartRepository) RemoveOrder(order *entity.Order) error {
+	cart, _ := cRepository.GetCart()
 
-// func (cRepository CartRepository) RemoveProduct(productId int) error {
-// 	cart, err := cRepository.GetCart()
-// 	if err != nil {
-// 		return err
-// 	}
-// 	productList := cart.Products
-// 	var index int
-// 	for i, product := range productList {
-// 		if product.ID == productId {
-// 			index = i
-// 			break
-// 		}
-// 	}
-// 	cRepository.db.Preload("Products").First(&cart)
-// 	cart.TotalPrice -= cart.Products[index].Price
-// 	cart.Products = append(cart.Products[:index], cart.Products[index+1:]...)
-// 	if err := cRepository.db.Session(&gorm.Session{FullSaveAssociations: true}).Updates(&cart).Error; err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
+	var index int
+	for i, entry := range cart.OrdersList {
+		if entry.ProductID == order.ProductID {
+			index = i
+		}
+	}
+	cart.OrdersList = append(cart.OrdersList[:index], cart.OrdersList[index+1:]...)
+	cart.TotalPrice -= order.Product.Price * order.Quantity
 
-// func (cRepository CartRepository) GetProductsList() ([]entity.ProductEntry, error) {
-// 	// cart, _ := cRepository.GetCart()
-// 	productsList := []entity.ProductEntry{}
-// 	if err := cRepository.db.Find(&productsList).Error; err != nil {
-// 		return nil, err
-// 	}
-// 	return productsList, nil
-// }
+	if len(cart.OrdersList) == 0 {
+		if err := cRepository.DeleteCart(cart); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	cRepository.db.Model(&cart).Association("OrdersList").Replace(&cart.OrdersList)
+	if err := cRepository.db.Session(&gorm.Session{FullSaveAssociations: true}).Updates(&cart).Error; err != nil {
+		return err
+	}
+	return nil
+}

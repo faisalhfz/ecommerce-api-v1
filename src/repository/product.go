@@ -4,7 +4,6 @@ import (
 	"ecommerce-api/src/entity"
 	"ecommerce-api/src/entity/request"
 
-	"github.com/jinzhu/copier"
 	"gorm.io/gorm"
 )
 
@@ -14,9 +13,6 @@ type IProductRepository interface {
 	GetProduct(id int) (*entity.Product, error)
 	UpdateProduct(product *entity.Product, productNew entity.Product) error
 	DeleteProduct(product *entity.Product) error
-	CreateProductEntry(productEntryRequest request.CreateProductEntryRequest) (entity.ProductEntry, error)
-	// GetProductEntry(productId int) (*entity.ProductEntry, error)
-	// UpdateProductEntry(productEntry *entity.ProductEntry, newProductEntry request.CreateProductEntryRequest) error
 }
 
 type ProductRepository struct {
@@ -81,13 +77,4 @@ func (pRepository ProductRepository) DeleteProduct(product *entity.Product) erro
 		return err
 	}
 	return nil
-}
-
-func (pRepository ProductRepository) CreateProductEntry(productEntryRequest request.CreateProductEntryRequest) (entity.ProductEntry, error) {
-	var productEntry entity.ProductEntry
-	copier.Copy(&productEntry, &productEntryRequest)
-	if err := pRepository.db.Debug().Create(&productEntry).Error; err != nil {
-		return entity.ProductEntry{}, err
-	}
-	return productEntry, nil
 }

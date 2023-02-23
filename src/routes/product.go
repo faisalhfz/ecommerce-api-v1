@@ -14,5 +14,5 @@ func ProductRoutes(g *echo.Group, productHandler *handler.ProductHandler) {
 	g.DELETE("/products/:id", productHandler.DeleteProductByIdHandler)
 	g.POST("/products/:id/cart", productHandler.PostProductToCartByIdHandler)
 	// g.PUT("/products/:id/cart", productHandler.PutProductToCartByIdHandler)
-	// g.DELETE("/products/:id/cart", productHandler.DeleteProductToCartByIdHandler)
+	// g.DELETE("/products/:id/cart", productHandler.DeleteProductInCartByIdHandler)
 }
